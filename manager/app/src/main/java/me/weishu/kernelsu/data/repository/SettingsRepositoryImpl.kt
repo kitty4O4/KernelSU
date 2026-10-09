@@ -41,12 +41,14 @@ class SettingsRepositoryImpl : SettingsRepository {
         get() = prefs.getString("ui_mode", UiMode.DEFAULT_VALUE) ?: UiMode.DEFAULT_VALUE
         set(value) = prefs.edit { putString("ui_mode", value) }
 
+    // Direct Install/Update disabled — default OFF
     override var checkUpdate: Boolean
-        get() = prefs.getBoolean("check_update", true)
+        get() = prefs.getBoolean("check_update", false)
         set(value) = prefs.edit { putBoolean("check_update", value) }
 
+    // Direct Install/Update disabled — default OFF
     override var checkModuleUpdate: Boolean
-        get() = prefs.getBoolean("module_check_update", true)
+        get() = prefs.getBoolean("module_check_update", false)
         set(value) = prefs.edit { putBoolean("module_check_update", value) }
 
     override var themeMode: Int
