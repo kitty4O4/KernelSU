@@ -26,7 +26,6 @@ import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.navigation3.Navigator
-import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.viewmodel.HomeViewModel
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -62,7 +61,8 @@ fun HomePager(
     }
 
     val actions = HomeActions(
-        onInstallClick = { navigator.push(Route.Install) },
+        // Direct Install/Update removed — this action is now a no-op
+        onInstallClick = { /* Direct Install/Update disabled */ },
         onOpenUrl = uriHandler::openUri,
         onJailbreakClick = {
             loadingDialog.showLoading()
