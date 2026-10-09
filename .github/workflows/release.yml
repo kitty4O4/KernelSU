@@ -1,71 +1,99 @@
-name: Release
+name: Build Manager
+
 on:
   push:
-    tags:
-      - "samsung-*"
+    branches: [ "main" ]
+    paths:
+      - '.github/workflows/build-manager.yml'
+      - 'manager/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - '.github/workflows/build-manager.yml'
+      - 'manager/**'
   workflow_dispatch:
 
 jobs:
   build-manager:
-    uses: ./.github/workflows/build-manager.yml
-    secrets: inherit
-  release:
-    needs:
-      - build-manager
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./manager
+
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v8
-
-      - name: Rename ksud
-        run: |
-          mkdir -p ksud
-          for dir in ./ksud-*; do
-            if [ -d "$dir" ]; then
-                echo "----- Rename $dir -----"
-                ksud_platform_name=$(basename "$dir")
-                if [ -f "$dir/ksud" ]; then
-                  mv "$dir/ksud" "ksud/$ksud_platform_name"
-                elif [ -f "$dir/ksud.exe" ]; then
-                  mv "$dir/ksud.exe" "ksud/$ksud_platform_name.exe"
-                fi
-            fi
-          done
-
-      - name: Rename ksuinit
-        run: |
-          mkdir -p ksuinit
-          for dir in ./ksuinit-*; do
-            if [ -d "$dir" ]; then
-                echo "----- Rename $dir -----"
-                ksuinit_platform_name=$(basename "$dir")
-                if [ -f "$dir/ksuinit" ]; then
-                  mv "$dir/ksuinit" "ksuinit/$ksuinit_platform_name"
-                fi
-            fi
-          done
-
-      - name: Rename lkm
-        run: |
-          mkdir -p lkm
-          for dir in ./*-android*-lkm; do
-            if [ -d "$dir" ]; then
-                echo "----- Rename $dir -----"
-                lkm_platform_name=$(basename "$dir")
-                lkm_platform_name="lkm-${lkm_platform_name%-lkm}_kernelsu.ko"
-                KO="$(ls $dir/*_kernelsu.ko)"
-                mv "$KO" "lkm/$lkm_platform_name"
-            fi
-          done
-
-      - name: Display structure of downloaded files
-        run: ls -R
-
-      - name: release
-        uses: softprops/action-gh-release@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          files: |
-            manager/*.apk
-            lkm/lkm-*_kernelsu.ko
-            ksud/ksud-*
-            ksuinit/*
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Debug APK
+        run: ./gradlew clean assembleDebug
+
+      - name: Build Release APK (unsigned)
+        run: ./gradlew assembleRelease
+
+      - name: Sign Release APK
+        id: sign_release
+        run: |
+          APK=$(find app/build/outputs/apk/release -name "*.apk" -not -name "*-signed.apk" | head -1)
+          if [ -z "$APK" ]; then
+            echo "No release APK found"
+            exit 1
+          fi
+          echo "Signing: $APK"
+          # Create a debug keystore on the runner (or use a secret if provided)
+          if [ -n "${{ secrets.KEYSTORE }}" ]; then
+            echo "${{ secrets.KEYSTORE }}" | base64 -d > release.keystore
+            KEYSTORE_FILE="release.keystore"
+            KEYSTORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}"
+            KEY_ALIAS="${{ secrets.KEY_ALIAS }}"
+            KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}"
+          else
+            # Fallback: generate a temporary release keystore
+            keytool -genkeypair \
+              -alias release-key \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "temppass123" -keypass "temppass123" \
+              -dname "CN=KernelSU Kitty, OU=Dev, O=Kitty, L=X, ST=X, C=US" \
+              -storetype JKS \
+              -keystore release.keystore
+            KEYSTORE_FILE="release.keystore"
+            KEYSTORE_PASSWORD="temppass123"
+            KEY_ALIAS="release-key"
+            KEY_PASSWORD="temppass123"
+          fi
+          # Sign using apksigner from the Android SDK
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | head -1)
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE_FILE" \
+            --ks-pass "pass:$KEYSTORE_PASSWORD" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass "pass:$KEY_PASSWORD" \
+            --out "${APK%.apk}-signed.apk" \
+            "$APK"
+          echo "signed_apk=${APK%.apk}-signed.apk" >> $GITHUB_OUTPUT
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: KernelSU-Manager-debug
+          path: manager/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: KernelSU-Manager-release
+          path: manager/app/build/outputs/apk/release/*-signed.apk
+          if-no-files-found: error
+          retention-days: 30
