@@ -64,7 +64,6 @@ import me.weishu.kernelsu.KernelVersion
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.WarningLevel
-import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 import me.weishu.kernelsu.ui.component.material.ExpressiveScaffold
 import me.weishu.kernelsu.ui.component.material.SegmentedColumn
 import me.weishu.kernelsu.ui.component.material.SegmentedListItem
@@ -93,9 +92,10 @@ fun HomePagerMaterial(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(13.dp)
         ) {
-            if (state.checkUpdateEnabled) {
-                UpdateCard(state = state, actions = actions)
-            }
+            // Direct Install/Update removed — UpdateCard is never shown
+            // if (state.checkUpdateEnabled) {
+            //     UpdateCard(state = state, actions = actions)
+            // }
             if (state.showManagerPrBuildWarning) {
                 WarningCard(stringResource(id = R.string.home_pr_build_warning), level = WarningLevel.Notice)
             } else if (state.showKernelPrBuildWarning) {
@@ -109,7 +109,7 @@ fun HomePagerMaterial(
                     stringResource(
                         id = if (state.lkmMode == true) R.string.require_kernel_version else R.string.require_kernel_version_gki
                     ),
-                    onClick = if (state.lkmMode == true) actions.onInstallClick else null
+                    onClick = null // Direct Install/Update removed
                 )
             }
             if (state.requiresNewManager) {
@@ -123,7 +123,7 @@ fun HomePagerMaterial(
                 WarningCard(
                     message = stringResource(R.string.home_lkm_update_available),
                     level = WarningLevel.Notice,
-                    onClick = actions.onInstallClick,
+                    onClick = null // Direct Install/Update removed
                 )
             }
             if (state.showRootWarning) {
@@ -145,38 +145,39 @@ fun HomePagerMaterial(
     }
 }
 
-@Composable
-private fun UpdateCard(
-    state: HomeUiState,
-    actions: HomeActions,
-) {
-    val newVersion = state.latestVersionInfo
-    val title = stringResource(id = R.string.module_changelog)
-    val updateText = stringResource(id = R.string.module_update)
-
-    AnimatedVisibility(
-        visible = state.hasUpdate,
-        enter = fadeIn() + expandVertically(),
-        exit = shrinkVertically() + fadeOut()
-    ) {
-        val updateDialog = rememberConfirmDialog(onConfirm = { actions.onOpenUrl(newVersion.downloadUrl) })
-        WarningCard(
-            message = stringResource(id = R.string.new_version_available, newVersion.versionCode),
-            level = WarningLevel.Notice
-        ) {
-            if (newVersion.changelog.isEmpty()) {
-                actions.onOpenUrl(newVersion.downloadUrl)
-            } else {
-                updateDialog.showConfirm(
-                    title = title,
-                    content = newVersion.changelog,
-                    markdown = true,
-                    confirm = updateText
-                )
-            }
-        }
-    }
-}
+// Direct Install/Update removed — UpdateCard composable disabled
+// @Composable
+// private fun UpdateCard(
+//     state: HomeUiState,
+//     actions: HomeActions,
+// ) {
+//     val newVersion = state.latestVersionInfo
+//     val title = stringResource(id = R.string.module_changelog)
+//     val updateText = stringResource(id = R.string.module_update)
+//
+//     AnimatedVisibility(
+//         visible = state.hasUpdate,
+//         enter = fadeIn() + expandVertically(),
+//         exit = shrinkVertically() + fadeOut()
+//     ) {
+//         val updateDialog = rememberConfirmDialog(onConfirm = { actions.onOpenUrl(newVersion.downloadUrl) })
+//         WarningCard(
+//             message = stringResource(id = R.string.new_version_available, newVersion.versionCode),
+//             level = WarningLevel.Notice
+//         ) {
+//             if (newVersion.changelog.isEmpty()) {
+//                 actions.onOpenUrl(newVersion.downloadUrl)
+//             } else {
+//                 updateDialog.showConfirm(
+//                     title = title,
+//                     content = newVersion.changelog,
+//                     markdown = true,
+//                     confirm = updateText
+//                 )
+//             }
+//         }
+//     }
+// }
 
 @Composable
 private fun TopBar(
@@ -219,7 +220,7 @@ private fun StatusCard(
         }
         val statusSummary = when {
             ksuActive -> stringResource(R.string.home_working_version, "${state.ksuVersion}-${state.kernelUAPIVersion}")
-            notInstalled -> stringResource(R.string.home_click_to_install)
+            notInstalled -> stringResource(R.string.home_not_installed) // "click to install" hint removed
             else -> stringResource(R.string.home_unsupported_reason)
         }
         val workingMode = if (ksuActive) {
@@ -257,11 +258,7 @@ private fun StatusCard(
             color = containerColor,
             contentColor = contentColor,
             shape = MaterialTheme.shapes.large,
-            onClick = {
-                if (!state.isLateLoadMode) {
-                    actions.onInstallClick()
-                }
-            }
+            // onClick removed — Direct Install/Update disabled
         ) {
             ListItem(
                 modifier = Modifier,
